@@ -122,6 +122,11 @@ export default function UsdtAddressPage() {
       }
 
       // 刷新USDT地址列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data: updatedAddresses, error: fetchError } = await supabase
         .from('usdt_addresses')
         .select('*')
@@ -157,6 +162,11 @@ export default function UsdtAddressPage() {
         .eq('id', addressId);
 
       // 刷新列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('usdt_addresses')
         .select('*')
@@ -186,6 +196,11 @@ export default function UsdtAddressPage() {
       }
 
       // 刷新列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data, error: fetchError } = await supabase
         .from('usdt_addresses')
         .select('*')

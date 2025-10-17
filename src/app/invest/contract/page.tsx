@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,7 @@ interface UserVerification {
   id_card: string;
 }
 
-export default function ContractPage() {
+function ContractPageContent() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,13 +82,13 @@ export default function ContractPage() {
             ...productData,
             min_amount: investmentData.amount,
             max_amount: investmentData.amount
-          });
+          } as unknown as Product);
         } else {
           // 获取产品信息
           const { data, error: productError } = await supabase
             .from('investment_projects')
             .select('*')
-            .eq('id', parseInt(productId))
+            .eq('id', parseInt(productId || '0'))
             .single();
 
           if (productError) {
@@ -541,5 +541,13 @@ export default function ContractPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function ContractPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ContractPageContent />
+    </Suspense>
   );
 }

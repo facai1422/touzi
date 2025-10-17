@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +18,7 @@ interface Product {
   description: string;
 }
 
-export default function InvestmentConfirmPage() {
+function InvestmentConfirmPageContent() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -371,5 +371,13 @@ export default function InvestmentConfirmPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function InvestmentConfirmPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InvestmentConfirmPageContent />
+    </Suspense>
   );
 }

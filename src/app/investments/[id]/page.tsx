@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
+
 interface InvestmentDetail {
   id: number;
   product_name: string;
@@ -73,7 +74,7 @@ export default function InvestmentDetailPage() {
 
         const formattedInvestment: InvestmentDetail = {
           id: data.id,
-          product_name: data.investment_projects?.name || '未知产品',
+          product_name: (data.investment_projects as { name?: string })?.name || '未知产品',
           amount: data.amount,
           expected_return: data.expected_return,
           actual_return: data.actual_return,
@@ -81,7 +82,7 @@ export default function InvestmentDetailPage() {
           maturity_time: data.end_date,
           status: data.status === 'completed' ? '已结算' : '进行中',
           duration: '30分钟',
-          interest_rate: data.investment_projects?.interest_rate || 0,
+          interest_rate: (data.investment_projects as { interest_rate?: number })?.interest_rate || 0,
           contract_number: `INV${data.id.toString().padStart(8, '0')}`
         };
 

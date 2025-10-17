@@ -29,8 +29,8 @@ const nextConfig: NextConfig = {
     // 移除console.log在生产环境
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  // 配置输出 - 适配Netlify
-  output: 'export',
+  // 配置输出 - 适配Netlify (禁用静态导出以支持动态路由)
+  // output: 'export',
   trailingSlash: true,
   images: {
     unoptimized: true

@@ -64,7 +64,7 @@ export default function InvestmentsPage() {
 
         const formattedInvestments = data?.map(inv => ({
           id: inv.id,
-          product_name: inv.investment_projects?.name || '未知产品',
+          product_name: (inv.investment_projects as { name?: string })?.name || '未知产品',
           amount: inv.amount,
           expected_return: inv.expected_return,
           actual_return: inv.actual_return,

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
+
 interface Product {
   id: number;
   title: string;
@@ -39,7 +40,7 @@ export default function ProductDetailPage() {
         console.log('🔍 开始获取产品详情，产品ID:', params.id);
         
         // 从数据库获取产品详情
-        const productId = parseInt(params.id);
+        const productId = parseInt(Array.isArray(params.id) ? params.id[0] : params.id || '0');
         console.log('🔍 查询产品ID:', productId, '类型:', typeof productId);
         
         const { data, error } = await supabase
@@ -274,7 +275,6 @@ export default function ProductDetailPage() {
         </Link>
         <h1 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 600 }}>
           {product.title}
-          {console.log('🎯 渲染标题:', product.title)}
         </h1>
       </div>
 

@@ -291,7 +291,7 @@ export default function FinancePage() {
             fontSize: '0.75rem',
             display: 'inline-block'
           }}>
-            类型: {getTypeText((record as any).type || 1)}
+            类型: {getTypeText((record as { type?: number }).type || 1)}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -308,7 +308,7 @@ export default function FinancePage() {
             {isWithdraw && '-'}
             {isInvestment && '-'}
             {isIncome && '+'}
-            {formatAmount((record as any).money || (record as any).amount || 0)}
+            {formatAmount((record as { money?: number; amount?: number }).money || (record as { money?: number; amount?: number }).amount || 0)}
           </div>
           <div style={{
             fontSize: '0.875rem',
