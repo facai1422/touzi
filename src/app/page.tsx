@@ -189,7 +189,7 @@ export default function HomePage() {
       {/* 快捷操作 */}
       <div className="quick-actions">
         <div className="quick-row">
-          <div className="quick-action">
+          <Link href="/products" className="quick-action">
             <div className="qa-icon qa-icon-products">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3" y="3" width="8" height="8" rx="1"></rect>
@@ -201,8 +201,8 @@ export default function HomePage() {
             <div className="qa-text">
               <span>研发产品</span>
             </div>
-          </div>
-          <div className="quick-action">
+          </Link>
+          <Link href="/about" className="quick-action">
             <div className="qa-icon qa-icon-about">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9"></circle>
@@ -213,7 +213,7 @@ export default function HomePage() {
             <div className="qa-text">
               <span>关于我们</span>
             </div>
-          </div>
+          </Link>
           <div className="quick-action" onClick={() => window.open('https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1', '_blank')}>
             <div className="qa-icon qa-icon-recharge">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -227,7 +227,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="quick-row">
-          <div className="quick-action">
+          <Link href="/withdraw" className="quick-action">
             <div className="qa-icon qa-icon-withdraw">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 3v10"></path>
@@ -238,8 +238,8 @@ export default function HomePage() {
             <div className="qa-text">
               <span>提款</span>
             </div>
-          </div>
-          <div className="quick-action">
+          </Link>
+          <div className="quick-action" onClick={() => window.open('https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1', '_blank')}>
             <div className="qa-icon qa-icon-service">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16v10H7l-3 3V5z"></path>
