@@ -18,13 +18,14 @@ interface Product {
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeCategory, setActiveCategory] = useState('全部')
+  const [activeCategory, setActiveCategory] = useState('医药')
   
-  const handleBuyClick = () => {
-    alert('项目已结束')
+  const handleBuyClick = (productId: number) => {
+    // 跳转到产品详情页面
+    window.location.href = `/products/${productId}`;
   }
 
-  const categories = ['全部', '医药', '生物技术', '医疗器械', '保健品']
+  const categories = ['医药']
 
   useEffect(() => {
     const mockProducts = [
@@ -102,9 +103,7 @@ export default function ProductsPage() {
     }, 1000)
   }, [])
 
-  const filteredProducts = activeCategory === '全部' 
-    ? products 
-    : products.filter(product => product.category === activeCategory)
+  const filteredProducts = products
 
   return (
     <div className="home-page">
@@ -181,7 +180,7 @@ export default function ProductsPage() {
                     </div>
                     <div className="data-item">
                       <div className="data-value">
-                        <span>{item.day}天</span>
+                        <span>{item.day}分钟</span>
                       </div>
                       <div className="data-label">
                         <span>投资期限</span>
@@ -195,7 +194,7 @@ export default function ProductsPage() {
                         <span>起投金额</span>
                       </div>
                     </div>
-                           <button className="buy-btn" onClick={handleBuyClick}>
+                           <button className="buy-btn" onClick={() => handleBuyClick(item.id)}>
                              {item.percent < 100 ? '马上认购' : '已满额'}
                            </button>
                   </div>
@@ -223,33 +222,19 @@ export default function ProductsPage() {
       <nav style={{position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTop: '1px solid #e5e7eb'}}>
         <div style={{display: 'flex'}}>
           <Link href="/" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <svg style={{width: '1.5rem', height: '1.5rem'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 3.172l8 6.4V20a1 1 0 01-1 1h-4a1 1 0 01-1-1v-5H10v5a1 1 0 01-1 1H5a1 1 0 01-1-1v-10l8-6.4zM12 1l-10 8v1.5a1 1 0 002 0V10l8-6.4L20 10v.5a1 1 0 002 0V9L12 1z"/>
-            </svg>
+            <img src="/tab-home.svg" alt="首页" style={{width: '1.5rem', height: '1.5rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>首页</span>
           </Link>
           <Link href="/products" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#ef4444'}}>
-            <svg style={{width: '1.5rem', height: '1.5rem'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
+            <img src="/tab-products-active.svg" alt="研发产品" style={{width: '1.5rem', height: '1.5rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>研发产品</span>
           </Link>
-          <Link href="/orders" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <svg style={{width: '1.5rem', height: '1.5rem'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>我的项目</span>
-          </Link>
           <Link href="/discover" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <svg style={{width: '1.5rem', height: '1.5rem'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-discover.svg" alt="发现" style={{width: '1.5rem', height: '1.5rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>发现</span>
           </Link>
           <Link href="/profile" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <svg style={{width: '1.5rem', height: '1.5rem'}} fill="currentColor" viewBox="0 0 24 24">
-              <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-            </svg>
+            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-profile.svg" alt="账户" style={{width: '1.5rem', height: '1.5rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>账户</span>
           </Link>
         </div>

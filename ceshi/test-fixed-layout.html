@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复后的横向菜单布局测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f9fafb;
+            margin: 0;
+            padding: 1rem;
+        }
+        
+        .menu-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .menu-title {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+            font-weight: 500;
+        }
+        
+        .menu-list {
+            background: #fff;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.06);
+        }
+        
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            text-decoration: none;
+            color: #111827;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.2s;
+            flex-direction: row;
+        }
+        
+        .menu-item:hover {
+            background: #f9fafb;
+        }
+        
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+        
+        .menu-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            order: 1;
+        }
+        
+        .menu-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* 图标颜色 */
+        .real-name-icon {
+            color: #3b82f6;
+        }
+        
+        .fund-icon {
+            color: #f59e0b;
+        }
+        
+        .investment-icon {
+            color: #10b981;
+        }
+        
+        .recharge-icon {
+            color: #3b82f6;
+        }
+        
+        .withdraw-icon {
+            color: #3b82f6;
+        }
+        
+        .bank-card-icon {
+            color: #ec4899;
+        }
+        
+        .menu-text {
+            flex: 1;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-left: 0;
+            order: 2;
+        }
+        
+        .menu-arrow {
+            color: #9ca3af;
+            font-size: 1.25rem;
+            margin-left: auto;
+            flex-shrink: 0;
+            order: 3;
+        }
+        
+        .debug-info {
+            background: #e5f3ff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>修复后的横向菜单布局测试</h1>
+    
+    <!-- 资产管理 -->
+    <div class="menu-section">
+        <div class="menu-title">资产管理</div>
+        <div class="menu-list">
+            <a href="#" class="menu-item">
+                <div class="menu-icon real-name-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
+                    </svg>
+                </div>
+                <div class="menu-text">实名信息</div>
+                <div class="menu-arrow">›</div>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="menu-icon fund-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <path d="M9 9h6v6H9z"/>
+                    </svg>
+                </div>
+                <div class="menu-text">资金明细</div>
+                <div class="menu-arrow">›</div>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="menu-icon investment-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                </div>
+                <div class="menu-text">投资明细</div>
+                <div class="menu-arrow">›</div>
+            </a>
+        </div>
+    </div>
+    
+    <!-- 交易操作 -->
+    <div class="menu-section">
+        <div class="menu-title">交易操作</div>
+        <div class="menu-list">
+            <a href="#" class="menu-item">
+                <div class="menu-icon recharge-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 3v10"/>
+                        <path d="M9 10l3-3 3 3"/>
+                        <rect x="4" y="17" width="16" height="2" rx="1"/>
+                    </svg>
+                </div>
+                <div class="menu-text">充值</div>
+                <div class="menu-arrow">›</div>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="menu-icon withdraw-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 21v-10"/>
+                        <path d="M9 14l3 3 3-3"/>
+                        <rect x="4" y="3" width="16" height="2" rx="1"/>
+                    </svg>
+                </div>
+                <div class="menu-text">提款</div>
+                <div class="menu-arrow">›</div>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="menu-icon bank-card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="6" width="20" height="12" rx="2"/>
+                        <path d="M2 10h20"/>
+                    </svg>
+                </div>
+                <div class="menu-text">绑定银行卡</div>
+                <div class="menu-arrow">›</div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>✅ 修复说明：</h3>
+        <ul>
+            <li><strong>flex-direction: row</strong> - 强制横向布局</li>
+            <li><strong>order: 1, 2, 3</strong> - 明确元素顺序</li>
+            <li><strong>align-items: center</strong> - 垂直居中对齐</li>
+            <li><strong>图标在左，文字在中，箭头在右</strong></li>
+        </ul>
+        
+        <h3>🎯 布局结构：</h3>
+        <pre>
+[图标] [菜单名字]                    [箭头]
+[图标] [菜单名字]                    [箭头]
+[图标] [菜单名字]                    [箭头]
+        </pre>
+    </div>
+</body>
+</html>
