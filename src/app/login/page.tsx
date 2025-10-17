@@ -78,8 +78,8 @@ export default function LoginPage() {
     try {
       await login(formData.phone, formData.password);
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || '登录失败，请重试');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '登录失败，请重试');
     } finally {
       setLoading(false);
     }

@@ -13,7 +13,17 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NEXT_PUBLIC_SUPABASE_URL": "https://xfcbxphhesbhazmjaztj.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmY2J4cGhoZXNiaGF6bWphenRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MzA2MDQsImV4cCI6MjA3NjIwNjYwNH0.Fe3NMFJn8_rQDRbIKEc-SwLTC2Zj9AyVLtwJZF4IlVY",
+    "NODE_ENV": "production",
+    "NEXT_PUBLIC_APP_NAME": "北京世桥生物制药投资系统",
+    "NEXT_PUBLIC_APP_URL": "https://your-domain.com",
+    "NEXT_PUBLIC_CUSTOMER_SERVICE_URL": "https://chat2.boltcode.vip",
+    "NEXT_PUBLIC_BUSINESS_ID": "1",
+    "NEXT_PUBLIC_GROUP_ID": "0",
+    "NEXT_PUBLIC_SPECIAL": "1",
+    "NEXT_PUBLIC_DEV_MODE": "false",
+    "NEXT_PUBLIC_DEBUG": "false"
   },
   "functions": {
     "src/app/**/*.tsx": {

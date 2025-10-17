@@ -119,9 +119,9 @@ export default function VerificationPage() {
 
       // 清除之前的错误信息
       setError('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('文件上传失败:', err);
-      setError(err.message || '文件上传失败，请重试');
+      setError(err instanceof Error ? err.message : '文件上传失败，请重试');
     }
   };
 
@@ -205,8 +205,8 @@ export default function VerificationPage() {
       }
 
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || '提交失败，请重试');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '提交失败，请重试');
     } finally {
       setIsSubmitting(false);
     }

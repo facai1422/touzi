@@ -53,6 +53,17 @@ interface IncomeRecord {
   created_at: string;
 }
 
+// 获取类型文本
+const getTypeText = (type: number) => {
+  switch (type) {
+    case 1: return '充值';
+    case 2: return '提现';
+    case 3: return '投资';
+    case 4: return '收益';
+    default: return '未知';
+  }
+};
+
 export default function FinancePage() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
@@ -243,7 +254,7 @@ export default function FinancePage() {
   };
 
   // 渲染记录项
-  const renderRecordItem = (record: any, index: number) => {
+  const renderRecordItem = (record: RechargeRecord | WithdrawRecord | InvestmentRecord | IncomeRecord, index: number) => {
     const isRecharge = activeTab === 'recharge';
     const isWithdraw = activeTab === 'withdraw';
     const isInvestment = activeTab === 'investment';
@@ -280,7 +291,7 @@ export default function FinancePage() {
             fontSize: '0.75rem',
             display: 'inline-block'
           }}>
-            状态: {getStatusText(record.status)}
+            类型: {getTypeText((record as any).type || 1)}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -297,7 +308,7 @@ export default function FinancePage() {
             {isWithdraw && '-'}
             {isInvestment && '-'}
             {isIncome && '+'}
-            {formatAmount(record.amount)}
+            {formatAmount((record as any).money || (record as any).amount || 0)}
           </div>
           <div style={{
             fontSize: '0.875rem',

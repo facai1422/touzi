@@ -119,8 +119,8 @@ export default function RegisterPage() {
       await login(formData.phone, formData.password);
       router.push('/');
       
-    } catch (err: any) {
-      setError(err.message || '注册失败，请重试');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '注册失败，请重试');
     } finally {
       setLoading(false);
     }

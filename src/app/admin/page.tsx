@@ -8,8 +8,19 @@ interface DashboardStats {
   totalProducts: number;
   totalOrders: number;
   totalRevenue: number;
-  recentUsers: any[];
-  recentOrders: any[];
+  recentUsers: Array<{
+    id: number;
+    phone: string;
+    money: number;
+    created_at: string;
+  }>;
+  recentOrders: Array<{
+    id: number;
+    user_id: number;
+    money: number;
+    status: string;
+    created_at: string;
+  }>;
 }
 
 export default function AdminDashboard() {
@@ -206,13 +217,13 @@ export default function AdminDashboard() {
                   <td>¥{Number(order.money).toFixed(2)}</td>
                   <td>
                     <span className={`status-badge ${
-                      order.status === 0 ? 'status-pending' :
-                      order.status === 1 ? 'status-active' :
-                      order.status === 2 ? 'status-completed' : 'status-cancelled'
+                      order.status === '0' ? 'status-pending' :
+                      order.status === '1' ? 'status-active' :
+                      order.status === '2' ? 'status-completed' : 'status-cancelled'
                     }`}>
-                      {order.status === 0 ? '待处理' :
-                       order.status === 1 ? '已发货' :
-                       order.status === 2 ? '已完成' : '已取消'}
+                      {order.status === '0' ? '待处理' :
+                       order.status === '1' ? '已发货' :
+                       order.status === '2' ? '已完成' : '已取消'}
                     </span>
                   </td>
                   <td>{new Date(order.created_at).toLocaleDateString()}</td>

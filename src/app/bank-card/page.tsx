@@ -116,6 +116,11 @@ export default function BankCardPage() {
       }
 
       // 刷新银行卡列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data: updatedCards, error: fetchError } = await supabase
         .from('bank_cards')
         .select('*')
@@ -151,6 +156,11 @@ export default function BankCardPage() {
         .eq('id', cardId);
 
       // 刷新列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('bank_cards')
         .select('*')
@@ -180,6 +190,11 @@ export default function BankCardPage() {
       }
 
       // 刷新列表
+      if (!user?.id) {
+        setError('用户信息获取失败');
+        return;
+      }
+
       const { data, error: fetchError } = await supabase
         .from('bank_cards')
         .select('*')

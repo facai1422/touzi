@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function TestPage() {
   return (
     <div style={{ 
@@ -37,10 +39,10 @@ export default function TestPage() {
           请尝试访问以下页面：
         </p>
         <ul style={{ color: '#424242', margin: '0' }}>
-          <li><a href="/" style={{ color: '#1976d2' }}>首页</a></li>
-          <li><a href="/login" style={{ color: '#1976d2' }}>登录页面</a></li>
-          <li><a href="/admin/login" style={{ color: '#1976d2' }}>管理后台登录</a></li>
-          <li><a href="/admin/simple" style={{ color: '#1976d2' }}>管理后台测试</a></li>
+          <li><Link href="/" style={{ color: '#1976d2' }}>首页</Link></li>
+          <li><Link href="/login" style={{ color: '#1976d2' }}>登录页面</Link></li>
+          <li><Link href="/admin/login" style={{ color: '#1976d2' }}>管理后台登录</Link></li>
+          <li><Link href="/admin/simple" style={{ color: '#1976d2' }}>管理后台测试</Link></li>
         </ul>
       </div>
     </div>

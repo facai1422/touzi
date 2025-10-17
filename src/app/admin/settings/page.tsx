@@ -58,8 +58,8 @@ export default function AdminSettingsPage() {
         newPassword: '',
         confirmPassword: ''
       });
-    } catch (err: any) {
-      setError(err.message || '密码修改失败');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '密码修改失败');
     } finally {
       setLoading(false);
     }

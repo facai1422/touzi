@@ -82,21 +82,28 @@ export default function AccountSecurityPage() {
     setSuccess('');
 
     try {
-      // 验证当前密码
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: loginPasswordForm.currentPassword
-      });
+      // 验证当前密码 - 使用自定义用户系统
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('password')
+        .eq('id', user?.id)
+        .single();
 
-      if (signInError) {
+      if (userError || !userData) {
+        setError('用户信息获取失败');
+        return;
+      }
+
+      if (userData.password !== loginPasswordForm.currentPassword) {
         setError('当前密码错误');
         return;
       }
 
-      // 更新密码
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: loginPasswordForm.newPassword
-      });
+      // 更新密码 - 使用自定义用户系统
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ password: loginPasswordForm.newPassword })
+        .eq('id', user?.id);
 
       if (updateError) {
         throw updateError;
