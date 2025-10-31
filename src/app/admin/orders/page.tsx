@@ -2,562 +2,741 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import AdminGlassLayout from '@/components/ui/admin-glass-layout';
+import { formatBeijingTime } from '@/utils/timeUtils';
 
-interface Order {
+interface Investment {
   id: number;
   user_id: number;
-  product_id: number;
-  money: number;
-  status: number;
+  project_id: number;
+  amount: number;
+  expected_return: number;
+  actual_return: number;
+  start_date: string;
+  end_date: string;
+  status: string;
   created_at: string;
-  updated_at: string;
-  user_phone?: string;
-  product_title?: string;
+  users: {
+    phone: string;
+    name: string | null;
+    real_name: string | null;
+  };
+  investment_projects: {
+    name: string;
+    interest_rate: number;
+    duration_days: number;
+  }[];
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const [filter, setFilter] = useState<string>('all');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
 
   useEffect(() => {
-    loadOrders();
-  }, [currentPage, searchTerm, statusFilter]);
+    loadInvestments();
+    
+    // 自动处理到期订单
+    const processMaturedInvestments = async () => {
+      try {
+        const now = new Date();
+        
+        // 查找已到期但状态还是 active 的投资
+        const { data: maturedInvestments, error: fetchError } = await supabase
+          .from('user_investments')
+          .select('*')
+          .eq('status', 'active')
+          .lte('end_date', now.toISOString());
 
-  const loadOrders = async () => {
+        if (fetchError) {
+          console.error('获取到期投资失败:', fetchError);
+          return;
+        }
+
+        if (maturedInvestments && maturedInvestments.length > 0) {
+          console.log(`发现 ${maturedInvestments.length} 个到期订单，正在处理...`);
+          
+          // 批量更新到期订单状态
+          for (const investment of maturedInvestments) {
+            // 更新 user_investments 状态
+            await supabase
+              .from('user_investments')
+              .update({ 
+                status: 'completed',
+                actual_return: Number(investment.expected_return)
+              })
+              .eq('id', investment.id);
+
+            // 更新 investment_contracts 状态
+            await supabase
+              .from('investment_contracts')
+              .update({ 
+                contract_status: 'completed'
+              })
+              .eq('investment_id', investment.id);
+
+            // 更新用户余额
+            const { data: userData } = await supabase
+              .from('users')
+              .select('money')
+              .eq('id', investment.user_id)
+              .single();
+
+            if (userData) {
+              const newBalance = Number(userData.money) + Number(investment.amount) + Number(investment.expected_return);
+              
+              await supabase
+                .from('users')
+                .update({ money: newBalance.toString() })
+                .eq('id', investment.user_id);
+
+              // 创建财务记录
+              await supabase
+                .from('finance_transactions')
+                .insert({
+                  user_id: investment.user_id,
+                  transaction_type: 'income',
+                  amount: Number(investment.amount) + Number(investment.expected_return),
+                  balance_before: Number(userData.money),
+                  balance_after: newBalance,
+                  description: `投资到期结算 - 本金+收益`,
+                  created_at: new Date().toISOString()
+                });
+            }
+          }
+          
+          // 重新加载订单列表
+          loadInvestments();
+        }
+      } catch (error) {
+        console.error('处理到期订单失败:', error);
+      }
+    };
+
+    // 立即执行一次
+    processMaturedInvestments();
+    
+    // 每30秒检查一次
+    const interval = setInterval(processMaturedInvestments, 30000);
+    
+    return () => clearInterval(interval);
+  }, [filter]);
+
+  const loadInvestments = async () => {
     try {
       setLoading(true);
       
+      // 先获取投资订单
       let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          users!inner(phone),
-          products!inner(title_zh_cn)
-        `, { count: 'exact' });
+        .from('user_investments')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      // 搜索功能
-      if (searchTerm) {
-        query = query.or(`users.phone.ilike.%${searchTerm}%,products.title_zh_cn.ilike.%${searchTerm}%`);
+      if (filter !== 'all') {
+        query = query.eq('status', filter);
       }
 
-      // 状态筛选
-      if (statusFilter !== 'all') {
-        query = query.eq('status', parseInt(statusFilter));
-      }
+      const { data: investmentsData, error: investmentsError } = await query;
 
-      // 分页
-      const from = (currentPage - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-      
-      const { data, error, count } = await query
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (error) {
-        console.error('加载订单数据失败:', error);
+      if (investmentsError) {
+        console.error('获取投资订单失败:', investmentsError);
         return;
       }
 
-      // 处理数据格式
-      const processedOrders = data?.map(order => ({
-        ...order,
-        user_phone: order.users?.phone,
-        product_title: order.products?.title_zh_cn
-      })) || [];
+      // 手动关联查询用户和产品信息
+      const enrichedData = await Promise.all(
+        (investmentsData || []).map(async (investment) => {
+          // 获取用户信息
+          const { data: userData } = await supabase
+            .from('users')
+            .select('phone, name, real_name')
+            .eq('id', investment.user_id)
+            .single();
 
-      setOrders(processedOrders);
-      setTotalPages(Math.ceil((count || 0) / itemsPerPage));
+          // 获取产品信息
+          const { data: projectData } = await supabase
+            .from('investment_projects')
+            .select('name, interest_rate, duration_days')
+            .eq('id', investment.project_id)
+            .single();
+
+          return {
+            ...investment,
+            users: userData || { phone: '', name: null, real_name: null },
+            investment_projects: projectData ? [projectData] : []
+          };
+        })
+      );
+
+      setInvestments(enrichedData);
     } catch (error) {
-      console.error('加载订单数据失败:', error);
+      console.error('获取投资订单失败:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    loadOrders();
+  const handleViewDetail = (investment: Investment) => {
+    setSelectedInvestment(investment);
+    setShowDetailModal(true);
   };
 
-  const updateOrderStatus = async (orderId: number, newStatus: number) => {
+  const handleUpdateStatus = async (investmentId: number, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-
-      if (error) {
-        console.error('更新订单状态失败:', error);
+      const investment = investments.find(i => i.id === investmentId);
+      if (!investment) {
+        alert('未找到该订单');
         return;
       }
 
-      loadOrders();
+      // 如果设置为已完成，需要结算本金和利息到用户账户
+      if (newStatus === 'completed') {
+        // 1. 获取用户当前余额
+        const { data: userData, error: fetchError } = await supabase
+          .from('users')
+          .select('money, pending_principal, pending_interest')
+          .eq('id', investment.user_id)
+          .single();
+
+        if (fetchError) {
+          alert('获取用户信息失败');
+          return;
+        }
+
+        const currentBalance = Number(userData.money);
+        const settlementAmount = Number(investment.amount) + Number(investment.expected_return);
+        const newBalance = currentBalance + settlementAmount;
+
+        // 2. 更新用户余额（清除待收金额）
+        const { error: updateBalanceError } = await supabase
+          .from('users')
+          .update({
+            money: newBalance.toString(),
+            pending_principal: 0,
+            pending_interest: 0,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', investment.user_id);
+
+        if (updateBalanceError) {
+          console.error('更新用户余额失败:', updateBalanceError);
+          alert('更新用户余额失败');
+          return;
+        }
+
+        // 3. 创建财务流水记录
+        const { error: transactionError } = await supabase
+          .from('finance_transactions')
+          .insert({
+            user_id: investment.user_id,
+            transaction_type: 'investment_return',
+            amount: settlementAmount,
+            balance_before: currentBalance,
+            balance_after: newBalance,
+            status: 'completed',
+            description: `投资结算：本金${investment.amount}+利息${investment.expected_return}（管理员手动结算）`,
+            created_at: new Date().toISOString()
+          });
+
+        if (transactionError) {
+          console.error('创建财务流水失败:', transactionError);
+          // 不阻止订单状态更新，只记录错误
+        }
+      }
+
+      // 4. 更新订单状态
+      const { error } = await supabase
+        .from('user_investments')
+        .update({ 
+          status: newStatus,
+          actual_return: newStatus === 'completed' ? investment.expected_return : 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', investmentId);
+
+      if (error) {
+        console.error('更新订单状态失败:', error);
+        alert('更新订单状态失败');
+        return;
+      }
+
+      alert(newStatus === 'completed' ? '订单已完成并已结算到用户账户' : '订单状态更新成功');
+      loadInvestments();
     } catch (error) {
       console.error('更新订单状态失败:', error);
+      alert('更新订单状态失败');
     }
   };
 
-  const getStatusText = (status: number) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 0: return '待处理';
-      case 1: return '已发货';
-      case 2: return '已完成';
-      case 3: return '已取消';
-      default: return '未知';
+      case 'active':
+        return <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs">进行中</span>;
+      case 'completed':
+        return <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 rounded text-xs">已完成</span>;
+      case 'cancelled':
+        return <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs">已取消</span>;
+      default:
+        return <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs">{status}</span>;
     }
   };
 
-  const getStatusColor = (status: number) => {
-    switch (status) {
-      case 0: return 'warning';
-      case 1: return 'info';
-      case 2: return 'success';
-      case 3: return 'danger';
-      default: return 'secondary';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN');
-  };
+  const totalAmount = investments.reduce((sum, i) => sum + i.amount, 0);
+  const totalExpectedReturn = investments.reduce((sum, i) => sum + i.expected_return, 0);
 
   return (
-    <div className="orders-page">
-      <div className="page-header">
-        <h2>订单管理</h2>
-        <p>管理所有用户订单</p>
+    <AdminGlassLayout activePage="orders">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-white">订单管理</h1>
+          <p className="text-gray-400 mt-2">管理系统中的所有投资订单</p>
+        </div>
+
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="content-card">
+            <p className="text-sm text-gray-400">总订单数</p>
+            <p className="text-3xl font-bold text-indigo-400 mt-2">{investments.length}</p>
+          </div>
+          <div className="content-card">
+            <p className="text-sm text-gray-400">进行中</p>
+            <p className="text-3xl font-bold text-emerald-400 mt-2">
+              {investments.filter(i => i.status === 'active').length}
+            </p>
+          </div>
+          <div className="content-card">
+            <p className="text-sm text-gray-400">已完成</p>
+            <p className="text-3xl font-bold text-pink-400 mt-2">
+              {investments.filter(i => i.status === 'completed').length}
+            </p>
+          </div>
+          <div className="content-card">
+            <p className="text-sm text-gray-400">总投资金额</p>
+            <p className="text-3xl font-bold text-yellow-400 mt-2">
+              ¥{totalAmount.toLocaleString()}
+            </p>
+          </div>
+          <div className="content-card">
+            <p className="text-sm text-gray-400">总预期收益</p>
+            <p className="text-3xl font-bold text-cyan-400 mt-2">
+              ¥{totalExpectedReturn.toLocaleString()}
+            </p>
+          </div>
       </div>
 
-      {/* 搜索和筛选 */}
-      <div className="filter-section">
-        <form onSubmit={handleSearch} className="search-form">
-          <div className="search-input-group">
-            <input
-              type="text"
-              placeholder="搜索用户手机号或产品名称..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn">
-              <i className="material-icons">search</i>
-              搜索
+        {/* 筛选器 */}
+        <div className="content-card">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                filter === 'all' 
+                  ? 'bg-indigo-500 text-white' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              全部订单
             </button>
-          </div>
-        </form>
-        
-        <div className="filter-group">
-          <label>订单状态：</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="status-select"
-            aria-label="订单状态筛选"
-          >
-            <option value="all">全部</option>
-            <option value="0">待处理</option>
-            <option value="1">已发货</option>
-            <option value="2">已完成</option>
-            <option value="3">已取消</option>
-          </select>
+            <button
+              onClick={() => setFilter('active')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                filter === 'active' 
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              进行中
+            </button>
+            <button
+              onClick={() => setFilter('completed')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                filter === 'completed' 
+                  ? 'bg-indigo-500 text-white' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              已完成
+            </button>
+            <button
+              onClick={() => setFilter('cancelled')}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                filter === 'cancelled' 
+                  ? 'bg-red-500 text-white' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              已取消
+            </button>
         </div>
       </div>
 
       {/* 订单列表 */}
-      <div className="orders-table-container">
+        <div className="content-card">
         {loading ? (
-          <div className="loading-state">
-            <div className="loading-spinner"></div>
-            <p>正在加载订单数据...</p>
-          </div>
-        ) : (
-          <>
-            <div className="table-header">
-              <div className="table-info">
-                共 {orders.length} 个订单
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div style={{
+                  border: '3px solid rgba(99, 102, 241, 0.3)',
+                  borderTop: '3px solid #6366f1',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto 1rem'
+                }}></div>
+                <p className="text-gray-400">加载中...</p>
               </div>
             </div>
-
-            <div className="orders-table">
-              <div className="table-header-row">
-                <div className="col-id">订单ID</div>
-                <div className="col-user">用户</div>
-                <div className="col-product">产品</div>
-                <div className="col-amount">金额</div>
-                <div className="col-status">状态</div>
-                <div className="col-date">下单时间</div>
-                <div className="col-actions">操作</div>
+          ) : investments.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400">暂无订单数据</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">订单ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">用户信息</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">产品名称</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">投资金额</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">收益率</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">预期收益</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">状态</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">创建时间</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {investments.map((investment) => (
+                    <tr key={investment.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3 text-sm text-white">#{investment.id}</td>
+                      <td className="px-4 py-3 text-sm text-white">
+                        <div>
+                          <p className="font-medium">{investment.users?.real_name || investment.users?.name || '未设置'}</p>
+                          <p className="text-xs text-gray-400">{investment.users?.phone}</p>
               </div>
-
-              {orders.length > 0 ? (
-                orders.map((order) => (
-                  <div key={order.id} className="table-row">
-                    <div className="col-id">#{order.id}</div>
-                    <div className="col-user">{order.user_phone}</div>
-                    <div className="col-product">{order.product_title}</div>
-                    <div className="col-amount">¥{order.money?.toFixed(2)}</div>
-                    <div className="col-status">
-                      <span className={`status-badge status-${getStatusColor(order.status)}`}>
-                        {getStatusText(order.status)}
-                      </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-white">
+                        <div>
+                          <p className="font-medium">{investment.investment_projects?.[0]?.name || '未知产品'}</p>
+                          <p className="text-xs text-gray-400">
+                            期限: {investment.investment_projects?.[0]?.duration_days || 0}天
+                          </p>
                     </div>
-                    <div className="col-date">{formatDate(order.created_at)}</div>
-                    <div className="col-actions">
-                      {order.status === 0 && (
+                      </td>
+                      <td className="px-4 py-3 text-sm text-white font-semibold">
+                        ¥{investment.amount.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-cyan-400 font-semibold">
+                        {investment.investment_projects?.[0]?.interest_rate || 0}%
+                      </td>
+                      <td className="px-4 py-3 text-sm text-emerald-400 font-semibold">
+                        ¥{investment.expected_return.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {getStatusBadge(investment.status)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400">
+                        {formatBeijingTime(investment.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
                         <button
-                          className="action-btn process"
-                          onClick={() => updateOrderStatus(order.id, 1)}
+                          onClick={() => handleViewDetail(investment)}
+                          className="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded hover:bg-indigo-500/30 transition-colors text-xs"
                         >
-                          <i className="material-icons">local_shipping</i>
-                          发货
+                          详情
                         </button>
-                      )}
-                      {order.status === 1 && (
-                        <button
-                          className="action-btn complete"
-                          onClick={() => updateOrderStatus(order.id, 2)}
-                        >
-                          <i className="material-icons">check_circle</i>
-                          完成
-                        </button>
-                      )}
-                      {(order.status === 0 || order.status === 1) && (
-                        <button
-                          className="action-btn cancel"
-                          onClick={() => updateOrderStatus(order.id, 3)}
-                        >
-                          <i className="material-icons">cancel</i>
-                          取消
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-data">
-                  <i className="material-icons">shopping_cart</i>
-                  <p>暂无订单数据</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
                 </div>
               )}
             </div>
-
-            {/* 分页 */}
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button
-                  className="page-btn"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  上一页
-                </button>
-                
-                <div className="page-info">
-                  第 {currentPage} 页，共 {totalPages} 页
-                </div>
-                
-                <button
-                  className="page-btn"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  下一页
-                </button>
-              </div>
-            )}
-          </>
-        )}
       </div>
 
+      {/* 订单详情模态框 */}
+      {showDetailModal && selectedInvestment && (
+        <OrderDetailModal
+          investment={selectedInvestment}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedInvestment(null);
+          }}
+          onUpdateStatus={handleUpdateStatus}
+        />
+      )}
+
+      {/* 动画样式 */}
       <style jsx>{`
-        .orders-page {
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .page-header {
-          margin-bottom: 2rem;
-        }
-
-        .page-header h2 {
-          font-size: 1.75rem;
-          font-weight: 600;
-          color: #2c3e50;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .page-header p {
-          color: #6c757d;
-          margin: 0;
-        }
-
-        .filter-section {
-          background: #fff;
-          border-radius: 8px;
-          padding: 1.5rem;
-          margin-bottom: 1.5rem;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          display: flex;
-          gap: 2rem;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .search-form {
-          flex: 1;
-          min-width: 300px;
-        }
-
-        .search-input-group {
-          display: flex;
-          gap: 1rem;
-        }
-
-        .search-input {
-          flex: 1;
-          padding: 0.75rem 1rem;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 0.875rem;
-        }
-
-        .search-input:focus {
-          outline: none;
-          border-color: #28a745;
-        }
-
-        .search-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: #28a745;
-          color: #fff;
-          border: none;
-          padding: 0.75rem 1.5rem;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-
-        .search-btn:hover {
-          background: #218838;
-        }
-
-        .filter-group {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .filter-group label {
-          color: #6c757d;
-          font-size: 0.875rem;
-        }
-
-        .status-select {
-          padding: 0.75rem;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 0.875rem;
-          background: #fff;
-        }
-
-        .orders-table-container {
-          background: #fff;
-          border-radius: 8px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          overflow: hidden;
-        }
-
-        .table-header {
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #e9ecef;
-          background: #f8f9fa;
-        }
-
-        .table-info {
-          color: #6c757d;
-          font-size: 0.875rem;
-        }
-
-        .orders-table {
-          overflow-x: auto;
-        }
-
-        .table-header-row {
-          display: grid;
-          grid-template-columns: 100px 120px 200px 100px 100px 150px 200px;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          background: #f8f9fa;
-          font-weight: 600;
-          color: #2c3e50;
-          border-bottom: 1px solid #e9ecef;
-        }
-
-        .table-row {
-          display: grid;
-          grid-template-columns: 100px 120px 200px 100px 100px 150px 200px;
-          gap: 1rem;
-          padding: 1rem 1.5rem;
-          border-bottom: 1px solid #f8f9fa;
-          align-items: center;
-        }
-
-        .table-row:hover {
-          background: #f8f9fa;
-        }
-
-        .col-id, .col-user, .col-product, .col-amount, .col-status, .col-date, .col-actions {
-          font-size: 0.875rem;
-        }
-
-        .status-badge {
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-
-        .status-badge.status-warning {
-          background: #fff3cd;
-          color: #856404;
-        }
-
-        .status-badge.status-info {
-          background: #d1ecf1;
-          color: #0c5460;
-        }
-
-        .status-badge.status-success {
-          background: #d4edda;
-          color: #155724;
-        }
-
-        .status-badge.status-danger {
-          background: #f8d7da;
-          color: #721c24;
-        }
-
-        .status-badge.status-secondary {
-          background: #e2e3e5;
-          color: #383d41;
-        }
-
-        .action-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.25rem;
-          padding: 0.25rem 0.5rem;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 0.75rem;
-          margin-right: 0.5rem;
-          transition: all 0.2s;
-        }
-
-        .action-btn.process {
-          background: #17a2b8;
-          color: #fff;
-        }
-
-        .action-btn.complete {
-          background: #28a745;
-          color: #fff;
-        }
-
-        .action-btn.cancel {
-          background: #dc3545;
-          color: #fff;
-        }
-
-        .action-btn:hover {
-          opacity: 0.8;
-        }
-
-        .loading-state, .no-data {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 3rem;
-          color: #6c757d;
-        }
-
-        .loading-spinner {
-          width: 2rem;
-          height: 2rem;
-          border: 2px solid #e9ecef;
-          border-top: 2px solid #28a745;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 1rem;
-        }
-
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
-
-        .pagination {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 1rem;
-          padding: 1.5rem;
-          border-top: 1px solid #e9ecef;
-        }
-
-        .page-btn {
-          padding: 0.5rem 1rem;
-          border: 1px solid #ddd;
-          background: #fff;
-          color: #2c3e50;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-
-        .page-btn:hover:not(:disabled) {
-          background: #f8f9fa;
-        }
-
-        .page-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .page-info {
-          color: #6c757d;
-          font-size: 0.875rem;
-        }
-
-        @media (max-width: 768px) {
-          .filter-section {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          
-          .search-form {
-            min-width: auto;
-          }
-          
-          .table-header-row, .table-row {
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-          }
-        }
       `}</style>
-    </div>
+    </AdminGlassLayout>
   );
 }
+
+interface OrderDetailModalProps {
+  investment: Investment;
+  onClose: () => void;
+  onUpdateStatus: (id: number, status: string) => void;
+}
+
+const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ investment, onClose, onUpdateStatus }) => {
+  const [newStatus, setNewStatus] = useState(investment.status);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newStatus !== investment.status) {
+      onUpdateStatus(investment.id, newStatus);
+      onClose();
+    } else {
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0, 0, 0, 0.5)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '16px'
+    }}>
+      <div className="content-card" style={{
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }}>
+        {/* 标题栏 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '24px',
+          paddingBottom: '16px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h3 style={{ 
+            fontSize: '20px', 
+            fontWeight: '600', 
+            color: 'white',
+            margin: 0
+          }}>
+            订单详情 #{investment.id}
+          </h3>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* 用户信息 */}
+            <div>
+              <h4 style={{ 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: 'white', 
+                marginBottom: '16px' 
+              }}>
+                用户信息
+              </h4>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '12px',
+                padding: '12px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '8px'
+              }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>用户姓名</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {investment.users?.real_name || investment.users?.name || '未设置'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>手机号</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {investment.users?.phone}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 产品信息 */}
+            <div>
+              <h4 style={{ 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: 'white', 
+                marginBottom: '16px' 
+              }}>
+                产品信息
+              </h4>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '12px',
+                padding: '12px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '8px'
+              }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>产品名称</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {investment.investment_projects?.[0]?.name || '未知产品'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>日收益率</p>
+                  <p style={{ fontSize: '14px', color: '#10b981', marginTop: '4px' }}>
+                    {investment.investment_projects?.[0]?.interest_rate || 0}%
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>投资期限</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {investment.investment_projects?.[0]?.duration_days || 0}天
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 订单信息 */}
+            <div>
+              <h4 style={{ 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: 'white', 
+                marginBottom: '16px' 
+              }}>
+                订单信息
+              </h4>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '12px',
+                padding: '12px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '8px'
+              }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>投资金额</p>
+                  <p style={{ fontSize: '14px', color: '#fbbf24', marginTop: '4px', fontWeight: '600' }}>
+                    ¥{investment.amount.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>预期收益</p>
+                  <p style={{ fontSize: '14px', color: '#10b981', marginTop: '4px', fontWeight: '600' }}>
+                    ¥{investment.expected_return.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>开始日期</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {formatBeijingTime(investment.start_date)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>结束日期</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {formatBeijingTime(investment.end_date)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>创建时间</p>
+                  <p style={{ fontSize: '14px', color: 'white', marginTop: '4px' }}>
+                    {formatBeijingTime(investment.created_at)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 状态管理 */}
+            <div>
+              <h4 style={{ 
+                fontSize: '16px', 
+                fontWeight: '600', 
+                color: 'white', 
+                marginBottom: '16px' 
+              }}>
+                订单状态
+              </h4>
+              <select
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="active" style={{ background: '#1e293b', color: 'white' }}>进行中</option>
+                <option value="completed" style={{ background: '#1e293b', color: 'white' }}>已完成</option>
+                <option value="cancelled" style={{ background: '#1e293b', color: 'white' }}>已取消</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 按钮组 */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            marginTop: '24px',
+            paddingTop: '24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              关闭
+            </button>
+            <button
+              type="submit"
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              保存修改
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

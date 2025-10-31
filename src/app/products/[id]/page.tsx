@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 interface Product {
@@ -24,14 +25,92 @@ interface Product {
   start_date?: string;
   end_date?: string;
   repayment_date?: string;
+  status?: string; // 产品状态
 }
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(1);
+  const [isVerified, setIsVerified] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isProductClosed, setIsProductClosed] = useState(false);
+
+  // 处理立即投资按钮点击
+  const handleBuyClick = () => {
+    if (product) {
+      console.log('立即投资按钮被点击:', product);
+      router.push(`/invest/confirm?productId=${product.id}`);
+    }
+  };
+
+  // 格式化日期显示 - 北京时间
+  // const formatDate = (dateString: string) => {
+  //   if (!dateString) return '未知时间';
+    
+  //   return new Date(dateString).toLocaleString('zh-CN', {
+  //     timeZone: 'Asia/Shanghai',
+  //     year: 'numeric',
+  //     month: '2-digit',
+  //     day: '2-digit',
+  //     hour: '2-digit',
+  //     minute: '2-digit',
+  //     second: '2-digit',
+  //     hour12: false
+  //   });
+  // };
+
+  // 检查用户实名认证状态
+  useEffect(() => {
+    const checkVerification = async () => {
+      if (!user) {
+        setCheckingVerification(false);
+        return;
+      }
+
+      try {
+        // 从 user_verifications 表检查
+        const { data: verificationData } = await supabase
+          .from('user_verifications')
+          .select('real_name, status')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // 如果 user_verifications 表没有数据，检查 users 表
+        if (!verificationData?.real_name) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('real_name, verification_status')
+            .eq('id', user.id)
+            .single();
+
+          if (userData && userData.real_name) {
+            setIsVerified(true);
+          } else {
+            setIsVerified(false);
+            setErrorMessage('请先完成实名认证');
+          }
+        } else {
+          // 只要 user_verifications 表有记录，就认为已认证（无论status）
+          setIsVerified(true);
+        }
+      } catch (error) {
+        console.error('检查实名认证失败:', error);
+        setIsVerified(false);
+        setErrorMessage('检查认证状态失败，请重试');
+      } finally {
+        setCheckingVerification(false);
+      }
+    };
+
+    checkVerification();
+  }, [user]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -65,14 +144,14 @@ export default function ProductDetailPage() {
               rate: '4.38',
               day: '30',
               min: '5000',
-              total: '90000000',
+              total: '1000000',
               percent: 24,
               cover: '/92da9381a07d507c50cb64a2b65a001a.png',
               description: '复方氨基酸（19）丙谷二肽注射液是一种营养支持药物',
               settlement_method: '按分钟付收益，到期自动赎回',
               risk_level: '提供基金托管服务',
               fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-              guarantor: '中国太平洋财产保险',
+              guarantor: '中国人民保险集团股份有限公司',
               start_date: '募满当日',
               end_date: '2025-10-22',
               repayment_date: '2025-10-23'
@@ -91,7 +170,7 @@ export default function ProductDetailPage() {
               settlement_method: '按分钟付收益，到期自动赎回',
               risk_level: '提供基金托管服务',
               fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-              guarantor: '中国太平洋财产保险',
+              guarantor: '中国人民保险集团股份有限公司',
               start_date: '募满当日',
               end_date: '2025-10-22',
               repayment_date: '2025-10-23'
@@ -110,7 +189,7 @@ export default function ProductDetailPage() {
               settlement_method: '按分钟付收益，到期自动赎回',
               risk_level: '提供基金托管服务',
               fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-              guarantor: '中国太平洋财产保险',
+              guarantor: '中国人民保险集团股份有限公司',
               start_date: '募满当日',
               end_date: '2025-10-22',
               repayment_date: '2025-10-23'
@@ -129,7 +208,7 @@ export default function ProductDetailPage() {
               settlement_method: '按分钟付收益，到期自动赎回',
               risk_level: '提供基金托管服务',
               fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-              guarantor: '中国太平洋财产保险',
+              guarantor: '中国人民保险集团股份有限公司',
               start_date: '募满当日',
               end_date: '2025-10-22',
               repayment_date: '2025-10-23'
@@ -148,7 +227,7 @@ export default function ProductDetailPage() {
               settlement_method: '按分钟付收益，到期自动赎回',
               risk_level: '提供基金托管服务',
               fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-              guarantor: '中国太平洋财产保险',
+              guarantor: '中国人民保险集团股份有限公司',
               start_date: '募满当日',
               end_date: '2025-10-22',
               repayment_date: '2025-10-23'
@@ -168,6 +247,14 @@ export default function ProductDetailPage() {
           }
         } else {
           console.log('✅ 数据库查询成功，产品数据:', data);
+          
+          // 检查产品状态是否为关闭/不活跃
+          if (data.status !== 'active') {
+            setIsProductClosed(true);
+            setErrorMessage('产品已关闭');
+            // 仍然显示产品信息，但按钮会被禁用
+          }
+          
           // 格式化数据库数据
           const formattedProduct: Product = {
             id: data.id,
@@ -183,10 +270,11 @@ export default function ProductDetailPage() {
             settlement_method: '按分钟付收益，到期自动赎回',
             risk_level: '提供基金托管服务',
             fund_usage: '本次发行资金，主要用于混合型股权直投运作',
-            guarantor: '中国太平洋财产保险',
+            guarantor: '中国人民保险集团股份有限公司',
             start_date: '募满当日',
             end_date: new Date(Date.now() + data.duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            repayment_date: new Date(Date.now() + (data.duration_days + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            repayment_date: new Date(Date.now() + (data.duration_days + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            status: data.status
           };
           console.log('✅ 设置数据库产品数据:', formattedProduct.title);
           setProduct(formattedProduct);
@@ -253,13 +341,19 @@ export default function ProductDetailPage() {
     );
   }
 
-         const handleInvest = () => {
-           // 跳转到投资确认页面
-           window.location.href = `/invest/confirm?productId=${product.id}&amount=${product.min}`;
-         };
+  const handleInvest = () => {
+    // 检查实名认证
+    if (!isVerified) {
+      setErrorMessage('请先完成实名认证才能进行投资');
+      return;
+    }
+
+    // 跳转到投资确认页面
+    window.location.href = `/invest/confirm?productId=${product.id}&amount=${product.min}`;
+  };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', paddingBottom: '6rem' }}>
       {/* 顶部导航 */}
       <div style={{
         background: '#3b82f6',
@@ -292,21 +386,23 @@ export default function ProductDetailPage() {
         </div>
 
         {/* 进度条 */}
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: '2rem', paddingBottom: '1rem' }}>
           <div style={{
             width: '100%',
-            height: '0.25rem',
+            height: '0.5rem',
             background: 'rgba(255, 255, 255, 0.3)',
-            borderRadius: '0.125rem',
+            borderRadius: '0.25rem',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            marginBottom: '0.75rem'
           }}>
             <div style={{
               width: `${product.percent}%`,
               height: '100%',
               background: 'white',
-              borderRadius: '0.125rem',
-              position: 'relative'
+              borderRadius: '0.25rem',
+              position: 'relative',
+              transition: 'width 0.3s ease'
             }}>
               <div style={{
                 position: 'absolute',
@@ -322,12 +418,14 @@ export default function ProductDetailPage() {
             </div>
           </div>
           <div style={{
-            textAlign: 'right',
-            fontSize: '0.75rem',
-            marginTop: '0.5rem',
-            opacity: 0.8
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.875rem',
+            opacity: 0.9
           }}>
-            已售{product.percent}%
+            <span>募集进度</span>
+            <span style={{ fontWeight: 600 }}>已售{product.percent}%</span>
           </div>
         </div>
 
@@ -357,141 +455,6 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* 时间线 */}
-        <div style={{
-          width: '100%',
-          marginTop: '0.75rem',
-          float: 'left',
-          minHeight: '4rem',
-          background: 'white',
-          padding: '0 0.75rem',
-          display: 'flex',
-          justifyContent: 'space-between'
-        }}>
-          <div style={{
-            width: '33.3%',
-            textAlign: 'left',
-            padding: '0.5rem 0'
-          }}>
-            <div style={{
-              lineHeight: '1.1rem',
-              fontSize: '0.65rem',
-              color: '#000',
-              marginBottom: '0.5rem'
-            }}>
-              开始计息
-            </div>
-            <div style={{
-              width: '100%',
-              height: '0.95rem',
-              padding: '0.4rem 0',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                left: '0',
-                top: '50%',
-                marginTop: '-0.275rem',
-                width: '0.4rem',
-                height: '0.4rem',
-                borderRadius: '0.275rem',
-                border: '0.075rem solid #005fff',
-                background: 'white'
-              }}></div>
-              <div style={{
-                width: '100%',
-                height: '0.075rem',
-                background: '#005fff'
-              }}></div>
-            </div>
-            <div style={{ color: '#999', fontSize: '0.6rem' }}>
-              {product.start_date}
-            </div>
-          </div>
-          
-          <div style={{
-            width: '33.3%',
-            textAlign: 'center',
-            padding: '0.5rem 0'
-          }}>
-            <div style={{
-              lineHeight: '1.1rem',
-              fontSize: '0.65rem',
-              color: '#000',
-              marginBottom: '0.5rem'
-            }}>
-              预计计息结束
-            </div>
-            <div style={{
-              width: '100%',
-              height: '0.95rem',
-              padding: '0.4rem 0',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                left: '50%',
-                marginLeft: '-0.2rem',
-                top: '50%',
-                marginTop: '-0.275rem',
-                width: '0.4rem',
-                height: '0.4rem',
-                borderRadius: '0.275rem',
-                border: '0.075rem solid #005fff',
-                background: 'white'
-              }}></div>
-              <div style={{
-                width: '100%',
-                height: '0.075rem',
-                background: '#005fff'
-              }}></div>
-            </div>
-            <div style={{ color: '#999', fontSize: '0.6rem' }}>
-              {product.end_date}
-            </div>
-          </div>
-          
-          <div style={{
-            width: '33.3%',
-            textAlign: 'right',
-            padding: '0.5rem 0'
-          }}>
-            <div style={{
-              lineHeight: '1.1rem',
-              fontSize: '0.65rem',
-              color: '#000',
-              marginBottom: '0.5rem'
-            }}>
-              预计回款到账
-            </div>
-            <div style={{
-              width: '100%',
-              height: '0.95rem',
-              padding: '0.4rem 0',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                right: '0',
-                top: '50%',
-                marginTop: '-0.275rem',
-                width: '0.4rem',
-                height: '0.4rem',
-                borderRadius: '0.275rem',
-                border: '0.075rem solid #e5e5e5',
-                background: 'white'
-              }}></div>
-              <div style={{
-                width: '100%',
-                height: '0.075rem',
-                background: '#e5e5e5'
-              }}></div>
-            </div>
-            <div style={{ color: '#999', fontSize: '0.6rem' }}>
-              {product.repayment_date}
-            </div>
-          </div>
-        </div>
 
         {/* 担保机构 */}
         <div style={{
@@ -654,12 +617,6 @@ export default function ProductDetailPage() {
                 <p style={{ marginBottom: '0.5rem' }}>• 到期自动赎回，本金和收益一次性到账</p>
                 <p style={{ marginBottom: '1rem' }}>• 提前赎回将按实际持有分钟数计算收益</p>
                 
-                <p style={{ marginBottom: '1rem' }}>
-                  <strong>风险提示：</strong>
-                </p>
-                <p style={{ marginBottom: '0.5rem' }}>• 投资有风险，入市需谨慎</p>
-                <p style={{ marginBottom: '0.5rem' }}>• 过往收益不代表未来收益</p>
-                <p>• 请根据自身风险承受能力谨慎投资</p>
               </div>
             </div>
           )}
@@ -697,26 +654,59 @@ export default function ProductDetailPage() {
         padding: '1rem',
         borderTop: '1px solid #e5e7eb'
       }}>
+        {/* 错误提示 */}
+        {errorMessage && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#dc2626',
+            padding: '0.75rem',
+            borderRadius: '0.5rem',
+            marginBottom: '0.75rem',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <span>{errorMessage}</span>
+            <button
+              onClick={() => setErrorMessage('')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                fontSize: '1.25rem',
+                cursor: 'pointer',
+                padding: 0,
+                lineHeight: 1
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <button
           onClick={handleInvest}
+          disabled={!isVerified || checkingVerification || isProductClosed}
           style={{
             width: '100%',
             height: '3rem',
-            background: '#3b82f6',
+            background: (!isVerified || checkingVerification || isProductClosed) ? '#9ca3af' : '#3b82f6',
             color: 'white',
             border: 'none',
             borderRadius: '0.5rem',
             fontSize: '1rem',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: (!isVerified || checkingVerification || isProductClosed) ? 'not-allowed' : 'pointer',
+            transition: 'background-color 0.3s ease'
           }}
         >
-          立即投资
+          {checkingVerification ? '检查中...' : isProductClosed ? '产品已关闭' : !isVerified ? '请先完成实名认证' : '立即投资'}
         </button>
       </div>
 
       {/* 底部间距 */}
-      <div style={{ height: '5rem' }}></div>
+      <div style={{ height: '8rem' }}></div>
     </div>
   );
 }
+

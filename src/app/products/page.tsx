@@ -2,17 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 interface Product {
   id: number
-  title: string
-  category: string
-  rate: string
-  day: string
-  min: string
-  total: string
-  percent: number
-  cover: string | null
+  name: string
+  description: string
+  min_amount: number
+  max_amount: number
+  interest_rate: number
+  duration_days: number
+  total_amount: number
+  invested_amount: number
+  status: string
+  img_zh_cn: string | null
 }
 
 export default function ProductsPage() {
@@ -20,7 +23,12 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState('医药')
   
-  const handleBuyClick = (productId: number) => {
+  const handleBuyClick = (productId: number, productStatus?: string) => {
+    // 检查产品状态
+    if (productStatus === 'inactive') {
+      alert('产品已关闭');
+      return;
+    }
     // 跳转到产品详情页面
     window.location.href = `/products/${productId}`;
   }
@@ -28,79 +36,137 @@ export default function ProductsPage() {
   const categories = ['医药']
 
   useEffect(() => {
-    const mockProducts = [
-      {
-        id: 1,
-        title: '复方氨基酸（19）丙谷二肽注射液',
-        category: '医药',
-        rate: '4.38',
-        day: '30',
-        min: '5000',
-        total: '90000000',
-        percent: 24,
-        cover: '/92da9381a07d507c50cb64a2b65a001a.png'
-      },
-      {
-        id: 2,
-        title: '左乙拉西坦注射用浓溶液',
-        category: '医药',
-        rate: '4.66',
-        day: '30',
-        min: '50000',
-        total: '50000000',
-        percent: 27,
-        cover: '/b083004105bee8a447ff9f568b6351f7.jpg'
-      },
-      {
-        id: 3,
-        title: '盐酸昂丹司琼注射液',
-        category: '医药',
-        rate: '5.00',
-        day: '30',
-        min: '200000',
-        total: '90000000',
-        percent: 33,
-        cover: '/5bfd9d2449b858a6328006141479cee8.jpg'
-      },
-      {
-        id: 4,
-        title: '氟伐他汀钠缓释片',
-        category: '医药',
-        rate: '5.72',
-        day: '30',
-        min: '500000',
-        total: '90000000',
-        percent: 45,
-        cover: 'https://shiqiao.gzbxwt.com/storage/images/9f2f41f82d9e1ad758f2d304c6867b2b.jpg'
-      },
-      {
-        id: 5,
-        title: '胸腺五肽注射液',
-        category: '医药',
-        rate: '4.85',
-        day: '30',
-        min: '100000',
-        total: '80000000',
-        percent: 38,
-        cover: 'https://shiqiao.gzbxwt.com/storage/images/cb42af1e487f7ade9d8cd7a9134732a8.jpg'
-      },
-      {
-        id: 6,
-        title: '膦甲酸钠注射液',
-        category: '医药',
-        rate: '5.25',
-        day: '30',
-        min: '150000',
-        total: '70000000',
-        percent: 42,
-        cover: 'https://shiqiao.gzbxwt.com/storage/images/8d7a7f34bd4e6bf46a19e87fb140f4e3.png'
+    const loadProducts = async () => {
+      try {
+        console.log('🔄 开始加载产品数据...')
+        
+        const { data, error } = await supabase
+          .from('investment_projects')
+          .select('*')
+          .in('status', ['active', 'inactive', 'paused']) // 显示活跃、关闭和暂停的产品，但不显示deleted
+          .order('id', { ascending: true })
+
+        if (error) {
+          console.error('❌ 数据库查询失败:', error)
+          console.log('🔄 使用备用产品数据...')
+          
+          // 使用备用产品数据
+          const fallbackProducts = [
+            {
+              id: 1,
+              name: '复方氨基酸（19）丙谷二肽注射液',
+              description: '低风险稳健理财产品，适合保守型投资者',
+              min_amount: 5000,
+              max_amount: 100000,
+              interest_rate: 6.50,
+              duration_days: 0.020833,
+              total_amount: 1000000,
+              invested_amount: 500000,
+              status: 'active',
+              img_zh_cn: '/92da9381a07d507c50cb64a2b65a001a.png'
+            },
+            {
+              id: 2,
+              name: '左乙拉西坦注射用浓溶液',
+              description: '中等风险成长型基金，适合稳健型投资者',
+              min_amount: 5000,
+              max_amount: 500000,
+              interest_rate: 8.20,
+              duration_days: 0.020833,
+              total_amount: 2000000,
+              invested_amount: 1200000,
+              status: 'active',
+              img_zh_cn: '/b083004105bee8a447ff9f568b6351f7.jpg'
+            },
+            {
+              id: 3,
+              name: '盐酸昂丹司琼注射液',
+              description: '高风险高收益产品，适合激进型投资者',
+              min_amount: 10000,
+              max_amount: 1000000,
+              interest_rate: 12.00,
+              duration_days: 0.020833,
+              total_amount: 5000000,
+              invested_amount: 3000000,
+              status: 'active',
+              img_zh_cn: '/5bfd9d2449b858a6328006141479cee8.jpg'
+            },
+            {
+              id: 4,
+              name: '氟伐他汀钠缓释片',
+              description: '短期理财产品，灵活投资',
+              min_amount: 500,
+              max_amount: 50000,
+              interest_rate: 4.50,
+              duration_days: 0.020833,
+              total_amount: 90000000,
+              invested_amount: 200000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/9f2f41f82d9e1ad758f2d304c6867b2b.jpg'
+            },
+            {
+              id: 5,
+              name: '胸腺五肽注射液',
+              description: '长期投资项目，稳定收益',
+              min_amount: 20000,
+              max_amount: 2000000,
+              interest_rate: 9.80,
+              duration_days: 0.020833,
+              total_amount: 80000000,
+              invested_amount: 5000000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/cb42af1e487f7ade9d8cd7a9134732a8.jpg'
+            },
+            {
+              id: 6,
+              name: '膦甲酸钠注射液',
+              description: '膦甲酸钠注射液是一种抗病毒药物，用于治疗病毒感染',
+              min_amount: 150000,
+              max_amount: 1000000,
+              interest_rate: 5.25,
+              duration_days: 0.020833,
+              total_amount: 90000000,
+              invested_amount: 40500000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/8d7a7f34bd4e6bf46a19e87fb140f4e3.png'
+            },
+          ]
+          
+          setProducts(fallbackProducts)
+          setLoading(false)
+          return
+        }
+
+        console.log('✅ 产品数据加载成功:', data?.length || 0, '个产品')
+        setProducts(data || [])
+        setLoading(false)
+      } catch (err) {
+        console.error('❌ 加载产品失败:', err)
+        console.log('🔄 使用备用产品数据...')
+        
+        // 使用备用产品数据
+        const fallbackProducts = [
+          {
+            id: 1,
+            name: '复方氨基酸（19）丙谷二肽注射液',
+            description: '低风险稳健理财产品，适合保守型投资者',
+            min_amount: 5000,
+            max_amount: 100000,
+            interest_rate: 6.50,
+            duration_days: 0.020833,
+            total_amount: 1000000,
+            invested_amount: 500000,
+            status: 'active',
+            img_zh_cn: '/92da9381a07d507c50cb64a2b65a001a.png'
+          }
+        ]
+        
+        setProducts(fallbackProducts)
+        setLoading(false)
       }
-    ]
-    
-    setTimeout(() => {
-      setProducts(mockProducts)
-      setLoading(false)
-    }, 1000)
+    }
+
+    loadProducts()
   }, [])
 
   const filteredProducts = products
@@ -153,8 +219,8 @@ export default function ProductsPage() {
               <div key={item.id} className="project-card">
                 <div className="project-cover-wrap">
                   <div className="project-cover">
-                    {item.cover ? (
-                      <img src={item.cover} alt="" className="project-bg" />
+                    {item.img_zh_cn ? (
+                      <img src={item.img_zh_cn} alt="" className="project-bg" />
                     ) : (
                       <div className="project-bg"></div>
                     )}
@@ -166,13 +232,13 @@ export default function ProductsPage() {
                       <span>保</span>
                     </div>
                     <div className="project-name">
-                      <span>{item.title}</span>
+                      <span>{item.name}</span>
                     </div>
                   </div>
                   <div className="project-row">
                     <div className="data-item">
                       <div className="data-value data-return">
-                        <span>{item.rate}%</span>
+                        <span>{item.interest_rate}%</span>
                       </div>
                       <div className="data-label">
                         <span>日化利率</span>
@@ -180,7 +246,7 @@ export default function ProductsPage() {
                     </div>
                     <div className="data-item">
                       <div className="data-value">
-                        <span>{item.day}分钟</span>
+                        <span>30分钟</span>
                       </div>
                       <div className="data-label">
                         <span>投资期限</span>
@@ -188,27 +254,27 @@ export default function ProductsPage() {
                     </div>
                     <div className="data-item">
                       <div className="data-value">
-                        <span>¥{item.min}</span>
+                        <span>¥{Number(item.min_amount).toLocaleString()}</span>
                       </div>
                       <div className="data-label">
                         <span>起投金额</span>
                       </div>
                     </div>
-                           <button className="buy-btn" onClick={() => handleBuyClick(item.id)}>
-                             {item.percent < 100 ? '马上认购' : '已满额'}
+                           <button className="buy-btn" onClick={() => handleBuyClick(item.id, item.status)}>
+                             {item.status === 'inactive' ? '已关闭' : Number(item.invested_amount) < Number(item.total_amount) ? '马上认购' : '已满额'}
                            </button>
                   </div>
                   <div className="project-info">
                     <div className="project-sub">
-                      <span>项目规模：¥{item.total}</span>
+                      <span>项目规模：¥{Number(item.total_amount).toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="progress-container">
                     <div className="progress-text">
-                      <span>募集进度 {item.percent}%</span>
+                      <span>募集进度 {Math.round((Number(item.invested_amount) / Number(item.total_amount)) * 100)}%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className="progress-fill" style={{width: `${item.percent}%`}}></div>
+                      <div className="progress-fill" style={{width: `${(Number(item.invested_amount) / Number(item.total_amount)) * 100}%`}}></div>
                     </div>
                   </div>
                 </div>
@@ -221,20 +287,20 @@ export default function ProductsPage() {
       {/* 底部导航 */}
       <nav style={{position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTop: '1px solid #e5e7eb'}}>
         <div style={{display: 'flex'}}>
-          <Link href="/" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="/tab-home.svg" alt="首页" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/首页.png" alt="首页" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>首页</span>
           </Link>
-          <Link href="/products" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#ef4444'}}>
-            <img src="/tab-products-active.svg" alt="研发产品" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/products" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#ef4444', textDecoration: 'none'}}>
+            <img src="/产品组1-2(1).png" alt="研发产品" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>研发产品</span>
           </Link>
-          <Link href="/discover" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-discover.svg" alt="发现" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/discover" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/发现.png" alt="发现" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>发现</span>
           </Link>
-          <Link href="/profile" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-profile.svg" alt="账户" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/profile" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/我的(1).png" alt="账户" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>账户</span>
           </Link>
         </div>

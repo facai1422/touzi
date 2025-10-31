@@ -5,29 +5,42 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { ChatWindow } from '@/components/customer-service/ChatWindow'
+import { PreloadIframe } from '@/components/PreloadIframe'
+import { IframeChatWindow } from '@/components/IframeChatWindow'
 
 interface Product {
   id: number
-  title_zh_cn: string
-  profit_rate: number
-  duration: number
-  min_invest: number
-  price: number
-  current_progress: number
-  max_progress: number
+  name: string
+  description: string
+  min_amount: number
+  max_amount: number
+  interest_rate: number
+  duration_days: number
+  total_amount: number
+  invested_amount: number
+  status: string
   img_zh_cn: string | null
-  status: number
 }
 
 export default function HomePage() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const { loading: authLoading, isAuthenticated, refreshUserBalance, user } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
+  const [showChat, setShowChat] = useState(false)
+  const [showIframeChat, setShowIframeChat] = useState(false)
   const router = useRouter()
   
-  const handleBuyClick = () => {
-    alert('项目已结束')
+  const handleBuyClick = (product: Product) => {
+    console.log('马上认购按钮被点击:', product);
+    // 检查产品状态
+    if (product.status === 'inactive') {
+      alert('产品已关闭');
+      return;
+    }
+    // 跳转到对应产品的详情页面
+    router.push(`/products/${product.id}/`)
   }
   
   const carouselImages = [
@@ -58,7 +71,12 @@ export default function HomePage() {
       router.push('/login')
       return
     }
-  }, [authLoading, isAuthenticated, router])
+    
+    // 刷新用户余额
+    if (isAuthenticated) {
+      refreshUserBalance()
+    }
+  }, [authLoading, isAuthenticated, router, refreshUserBalance])
 
   // 从数据库加载产品数据
   useEffect(() => {
@@ -66,23 +84,131 @@ export default function HomePage() {
 
     const loadProducts = async () => {
       try {
+        console.log('🔄 开始加载产品数据...')
+        
         const { data, error } = await supabase
-          .from('products')
+          .from('investment_projects')
           .select('*')
-          .eq('status', 1) // 只获取上架的产品
-          .order('sort', { ascending: true })
+          .in('status', ['active', 'inactive', 'paused']) // 显示活跃、关闭和暂停的产品
+          .order('id', { ascending: true })
           .limit(10)
 
         if (error) {
-          console.error('加载产品失败:', error)
+          console.error('❌ 数据库查询失败:', error)
+          console.log('🔄 使用备用产品数据...')
+          
+          // 使用备用产品数据
+          const fallbackProducts = [
+            {
+              id: 1,
+              name: '复方氨基酸（19）丙谷二肽注射液',
+              description: '低风险稳健理财产品，适合保守型投资者',
+              min_amount: 5000,
+              max_amount: 100000,
+              interest_rate: 6.50,
+              duration_days: 0.020833,
+              total_amount: 1000000,
+              invested_amount: 500000,
+              status: 'active',
+              img_zh_cn: '/92da9381a07d507c50cb64a2b65a001a.png'
+            },
+            {
+              id: 2,
+              name: '左乙拉西坦注射用浓溶液',
+              description: '中等风险成长型基金，适合稳健型投资者',
+              min_amount: 5000,
+              max_amount: 500000,
+              interest_rate: 8.20,
+              duration_days: 0.020833,
+              total_amount: 2000000,
+              invested_amount: 1200000,
+              status: 'active',
+              img_zh_cn: '/b083004105bee8a447ff9f568b6351f7.jpg'
+            },
+            {
+              id: 3,
+              name: '盐酸昂丹司琼注射液',
+              description: '高风险高收益产品，适合激进型投资者',
+              min_amount: 10000,
+              max_amount: 1000000,
+              interest_rate: 12.00,
+              duration_days: 0.020833,
+              total_amount: 5000000,
+              invested_amount: 3000000,
+              status: 'active',
+              img_zh_cn: '/5bfd9d2449b858a6328006141479cee8.jpg'
+            },
+            {
+              id: 4,
+              name: '氟伐他汀钠缓释片',
+              description: '短期理财产品，灵活投资',
+              min_amount: 500,
+              max_amount: 50000,
+              interest_rate: 4.50,
+              duration_days: 0.020833,
+              total_amount: 90000000,
+              invested_amount: 200000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/9f2f41f82d9e1ad758f2d304c6867b2b.jpg'
+            },
+            {
+              id: 5,
+              name: '胸腺五肽注射液',
+              description: '长期投资项目，稳定收益',
+              min_amount: 20000,
+              max_amount: 2000000,
+              interest_rate: 9.80,
+              duration_days: 0.020833,
+              total_amount: 80000000,
+              invested_amount: 5000000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/cb42af1e487f7ade9d8cd7a9134732a8.jpg'
+            },
+            {
+              id: 6,
+              name: '膦甲酸钠注射液',
+              description: '膦甲酸钠注射液是一种抗病毒药物，用于治疗病毒感染',
+              min_amount: 150000,
+              max_amount: 1000000,
+              interest_rate: 5.25,
+              duration_days: 0.020833,
+              total_amount: 90000000,
+              invested_amount: 40500000,
+              status: 'active',
+              img_zh_cn: 'https://shiqiao.gzbxwt.com/storage/images/8d7a7f34bd4e6bf46a19e87fb140f4e3.png'
+            },
+          ]
+          
+          setProducts(fallbackProducts)
           setLoading(false)
           return
         }
 
+        console.log('✅ 产品数据加载成功:', data?.length || 0, '个产品')
         setProducts(data || [])
         setLoading(false)
       } catch (err) {
-        console.error('加载产品失败:', err)
+        console.error('❌ 加载产品失败:', err)
+        console.log('🔄 使用备用产品数据...')
+        
+        // 使用备用产品数据
+        const fallbackProducts = [
+          {
+            id: 1,
+            name: '复方氨基酸（19）丙谷二肽注射液',
+            description: '低风险稳健理财产品，适合保守型投资者',
+            min_amount: 5000,
+            max_amount: 100000,
+            interest_rate: 6.50,
+            duration_days: 0.020833,
+            total_amount: 1000000,
+            invested_amount: 500000,
+            status: 'active',
+            img_zh_cn: '/92da9381a07d507c50cb64a2b65a001a.png'
+          }
+        ]
+        
+        setProducts(fallbackProducts)
         setLoading(false)
       }
     }
@@ -144,10 +270,6 @@ export default function HomePage() {
           <div className="header-title">
             <span>北京世桥生物制药有限公司</span>
           </div>
-          <div className="user-info">
-            <span>欢迎，{user?.phone}</span>
-            <span className="user-balance">余额：¥{user?.money?.toFixed(2) || '0.00'}</span>
-          </div>
         </div>
       </div>
 
@@ -180,6 +302,7 @@ export default function HomePage() {
                        key={index}
                        className={`carousel-indicator ${index === currentSlide ? 'active' : ''}`}
                        onClick={() => setCurrentSlide(index)}
+                       title={`切换到第${index + 1}张图片`}
                      />
                    ))}
                  </div>
@@ -189,19 +312,45 @@ export default function HomePage() {
       {/* 快捷操作 */}
       <div className="quick-actions">
         <div className="quick-row">
-          <Link href="/products" className="quick-action">
-            <div className="qa-icon qa-icon-products">
+          {/* 充值 */}
+          <div className="quick-action" onClick={() => setShowIframeChat(true)}>
+            <div className="qa-icon qa-icon-recharge">
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="3" width="8" height="8" rx="1"></rect>
-                <rect x="13" y="3" width="8" height="8" rx="1"></rect>
-                <rect x="3" y="13" width="8" height="8" rx="1"></rect>
-                <rect x="13" y="13" width="8" height="8" rx="1"></rect>
+                <rect x="3" y="7" width="18" height="12" rx="2"></rect>
+                <path d="M16 13h5"></path>
               </svg>
             </div>
             <div className="qa-text">
-              <span>研发产品</span>
+              <span>充值</span>
+            </div>
+          </div>
+          {/* 提现 */}
+          <Link href="/withdraw" className="quick-action">
+            <div className="qa-icon qa-icon-withdraw">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v10"></path>
+                <path d="M9 10l3 3 3-3"></path>
+                <rect x="4" y="17" width="16" height="2" rx="1"></rect>
+              </svg>
+            </div>
+            <div className="qa-text">
+              <span>提现</span>
             </div>
           </Link>
+          {/* 在线客服 */}
+          <div className="quick-action" onClick={() => setShowIframeChat(true)}>
+            <div className="qa-icon qa-icon-service">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16v10H7l-3 3V5z"></path>
+                <path d="M8 10h8"></path>
+                <path d="M8 14h6"></path>
+              </svg>
+            </div>
+            <div className="qa-text">
+              <span>在线客服</span>
+            </div>
+          </div>
+          {/* 关于我们 */}
           <Link href="/about" className="quick-action">
             <div className="qa-icon qa-icon-about">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -214,43 +363,6 @@ export default function HomePage() {
               <span>关于我们</span>
             </div>
           </Link>
-          <div className="quick-action" onClick={() => window.open('https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1', '_blank')}>
-            <div className="qa-icon qa-icon-recharge">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="7" width="18" height="12" rx="2"></rect>
-                <path d="M16 13h5"></path>
-              </svg>
-            </div>
-            <div className="qa-text">
-              <span>充值</span>
-            </div>
-          </div>
-        </div>
-        <div className="quick-row">
-          <Link href="/withdraw" className="quick-action">
-            <div className="qa-icon qa-icon-withdraw">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v10"></path>
-                <path d="M9 10l3 3 3-3"></path>
-                <rect x="4" y="17" width="16" height="2" rx="1"></rect>
-              </svg>
-            </div>
-            <div className="qa-text">
-              <span>提款</span>
-            </div>
-          </Link>
-          <div className="quick-action" onClick={() => window.open('https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1', '_blank')}>
-            <div className="qa-icon qa-icon-service">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 5h16v10H7l-3 3V5z"></path>
-                <path d="M8 10h8"></path>
-                <path d="M8 14h6"></path>
-              </svg>
-            </div>
-            <div className="qa-text">
-              <span>在线客服</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -301,13 +413,13 @@ export default function HomePage() {
                       <span>保</span>
                     </div>
                     <div className="project-name">
-                      <span>{item.title_zh_cn}</span>
+                      <span>{item.name}</span>
                     </div>
                   </div>
                   <div className="project-row">
                     <div className="data-item">
                       <div className="data-value data-return">
-                        <span>{item.profit_rate.toFixed(2)}%</span>
+                        <span>{item.interest_rate}%</span>
                       </div>
                       <div className="data-label">
                         <span>日化利率</span>
@@ -315,7 +427,7 @@ export default function HomePage() {
                     </div>
                     <div className="data-item">
                       <div className="data-value">
-                        <span>{item.duration}天</span>
+                        <span>30分钟</span>
                       </div>
                       <div className="data-label">
                         <span>投资期限</span>
@@ -323,7 +435,7 @@ export default function HomePage() {
                     </div>
                     <div className="data-item">
                       <div className="data-value">
-                        <span>¥{item.min_invest.toLocaleString()}</span>
+                        <span>¥{Number(item.min_amount).toLocaleString()}</span>
                       </div>
                       <div className="data-label">
                         <span>起投金额</span>
@@ -331,23 +443,23 @@ export default function HomePage() {
                     </div>
                            <button 
                              className="buy-btn" 
-                             onClick={handleBuyClick}
-                             aria-label={item.current_progress < item.max_progress ? '马上认购' : '已满额'}
+                             onClick={() => handleBuyClick(item)}
+                             aria-label={item.status === 'inactive' ? '已关闭' : Number(item.invested_amount) < Number(item.total_amount) ? '马上认购' : '已满额'}
                            >
-                             {item.current_progress < item.max_progress ? '马上认购' : '已满额'}
+                             {item.status === 'inactive' ? '已关闭' : Number(item.invested_amount) < Number(item.total_amount) ? '马上认购' : '已满额'}
                            </button>
                   </div>
                   <div className="project-info">
                     <div className="project-sub">
-                      <span>项目规模：¥{item.price.toLocaleString()}</span>
+                      <span>项目规模：¥{Number(item.total_amount).toLocaleString()}</span>
                     </div>
                   </div>
                   <div className="progress-container">
                     <div className="progress-text">
-                      <span>募集进度 {Math.round((item.current_progress / item.max_progress) * 100)}%</span>
+                      <span>募集进度 {Math.round((Number(item.invested_amount) / Number(item.total_amount)) * 100)}%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className="progress-fill" style={{width: `${(item.current_progress / item.max_progress) * 100}%`}}></div>
+                      <div className="progress-fill" style={{width: `${(Number(item.invested_amount) / Number(item.total_amount)) * 100}%`}}></div>
                     </div>
                   </div>
                 </div>
@@ -360,24 +472,44 @@ export default function HomePage() {
       {/* 底部导航 */}
       <nav style={{position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTop: '1px solid #e5e7eb'}}>
         <div style={{display: 'flex'}}>
-          <Link href="/" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#ef4444'}}>
-            <img src="/tab-home-active.svg" alt="首页" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#ef4444', textDecoration: 'none'}}>
+            <img src="/首页(1).png" alt="首页" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>首页</span>
           </Link>
-          <Link href="/products" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-products.svg" alt="研发产品" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/products" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/产品组1-2.png" alt="研发产品" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>研发产品</span>
           </Link>
-          <Link href="/discover" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-discover.svg" alt="发现" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/discover" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/发现.png" alt="发现" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>发现</span>
           </Link>
-          <Link href="/profile" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af'}}>
-            <img src="https://shiqiao.gzbxwt.com/h5/static/images/tab-profile.svg" alt="账户" style={{width: '1.5rem', height: '1.5rem'}} />
+          <Link href="/profile" style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0.5rem 0', color: '#9ca3af', textDecoration: 'none'}}>
+            <img src="/我的(1).png" alt="账户" style={{width: '2rem', height: '2rem'}} />
             <span style={{fontSize: '0.75rem', marginTop: '0.25rem'}}>账户</span>
           </Link>
         </div>
       </nav>
+
+      {/* 客服窗口 */}
+      {showChat && user && (
+        <ChatWindow 
+          userId={user.id.toString()} 
+          onClose={() => setShowChat(false)}
+        />
+      )}
+
+      {/* iframe 客服/充值窗口 */}
+      {showIframeChat && (
+        <IframeChatWindow 
+          url="https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1"
+          title="在线客服"
+          onClose={() => setShowIframeChat(false)}
+        />
+      )}
+
+      {/* 预加载发现页面的 iframe（在后台加载，用户看不见） */}
+      <PreloadIframe />
     </div>
   )
 }

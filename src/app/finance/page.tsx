@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { formatBeijingTime } from '@/utils/timeUtils';
 
 interface RechargeRecord {
   id: number;
@@ -54,18 +55,18 @@ interface IncomeRecord {
 }
 
 // 获取类型文本
-const getTypeText = (type: number) => {
-  switch (type) {
-    case 1: return '充值';
-    case 2: return '提现';
-    case 3: return '投资';
-    case 4: return '收益';
-    default: return '未知';
-  }
-};
+// const getTypeText = (type: number) => {
+//   switch (type) {
+//     case 1: return '充值';
+//     case 2: return '提现';
+//     case 3: return '投资';
+//     case 4: return '收益';
+//     default: return '未知';
+//   }
+// };
 
 export default function FinancePage() {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading, refreshUserBalance } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'recharge' | 'withdraw' | 'investment' | 'income'>('recharge');
   const [rechargeRecords, setRechargeRecords] = useState<RechargeRecord[]>([]);
@@ -82,6 +83,17 @@ export default function FinancePage() {
     }
   }, [loading, isAuthenticated, router]);
 
+  // 使用ref来避免无限循环
+  const hasRefreshed = useRef(false);
+
+  // 刷新用户余额 - 只在组件挂载时执行一次
+  useEffect(() => {
+    if (isAuthenticated && !hasRefreshed.current) {
+      refreshUserBalance();
+      hasRefreshed.current = true;
+    }
+  }, [isAuthenticated, refreshUserBalance]);
+
   // 获取财务数据
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -90,30 +102,58 @@ export default function FinancePage() {
       try {
         setIsLoading(true);
 
-        // 获取充值记录
+        // 获取充值记录（从finance_transactions表）
         const { data: rechargeData, error: rechargeError } = await supabase
-          .from('recharge_records')
+          .from('finance_transactions')
           .select('*')
           .eq('user_id', user.id)
+          .eq('transaction_type', 'recharge')
           .order('created_at', { ascending: false });
 
         if (rechargeError) {
           console.error('获取充值记录失败:', rechargeError);
         } else {
-          setRechargeRecords(rechargeData || []);
+          // 格式化充值记录以匹配接口
+          const formattedRecharge = rechargeData?.map(t => ({
+            id: t.id,
+            amount: t.amount,
+            payment_method: '管理员充值',
+            payment_account: '',
+            order_no: t.order_no || '',
+            status: t.status || 'completed',
+            completed_at: t.created_at,
+            created_at: t.created_at
+          })) || [];
+          setRechargeRecords(formattedRecharge);
         }
 
-        // 获取提现记录
+        // 获取提现记录（从finance_transactions表）
         const { data: withdrawData, error: withdrawError } = await supabase
-          .from('withdraw_records')
+          .from('finance_transactions')
           .select('*')
           .eq('user_id', user.id)
+          .eq('transaction_type', 'withdraw')
           .order('created_at', { ascending: false });
 
         if (withdrawError) {
           console.error('获取提现记录失败:', withdrawError);
         } else {
-          setWithdrawRecords(withdrawData || []);
+          // 格式化提现记录以匹配接口
+          const formattedWithdraw = withdrawData?.map(t => ({
+            id: t.id,
+            amount: t.amount,
+            fee: 0,
+            actual_amount: t.amount,
+            bank_name: '',
+            bank_account: '',
+            account_name: '',
+            order_no: t.order_no || '',
+            status: t.status || 'completed',
+            processed_at: t.created_at,
+            completed_at: t.created_at,
+            created_at: t.created_at
+          })) || [];
+          setWithdrawRecords(formattedWithdraw);
         }
 
         // 获取投资记录
@@ -213,29 +253,19 @@ export default function FinancePage() {
     }).format(amount);
   };
 
-  // 格式化日期显示
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   // 获取状态显示文字
-  const getStatusText = (status: string) => {
-    const statusMap: { [key: string]: string } = {
-      'pending': '待处理',
-      'completed': '成功',
-      'failed': '失败',
-      'cancelled': '已取消',
-      'active': '进行中',
-      'settled': '已结算'
-    };
-    return statusMap[status] || status;
-  };
+  // const getStatusText = (status: string) => {
+  //   const statusMap: { [key: string]: string } = {
+  //     'pending': '待处理',
+  //     'completed': '成功',
+  //     'failed': '失败',
+  //     'cancelled': '已取消',
+  //     'active': '进行中',
+  //     'settled': '已结算'
+  //   };
+  //   return statusMap[status] || status;
+  // };
 
   // 获取当前标签页的数据
   const getCurrentData = () => {
@@ -291,7 +321,7 @@ export default function FinancePage() {
             fontSize: '0.75rem',
             display: 'inline-block'
           }}>
-            类型: {getTypeText((record as { type?: number }).type || 1)}
+            类型: {isIncome ? '已结算' : (isWithdraw ? '成功' : (isInvestment ? '成功' : '充值'))}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -314,7 +344,7 @@ export default function FinancePage() {
             fontSize: '0.875rem',
             color: '#6b7280'
           }}>
-            {formatDate(record.created_at)}
+            {formatBeijingTime(record.created_at)}
           </div>
         </div>
       </div>
@@ -324,7 +354,7 @@ export default function FinancePage() {
   const currentData = getCurrentData();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', paddingBottom: '6rem' }}>
       {/* 顶部导航 */}
       <div style={{
         background: '#ef4444',
@@ -348,17 +378,17 @@ export default function FinancePage() {
         borderBottom: '1px solid #e5e7eb'
       }}>
         <button
-          onClick={() => window.open('https://chat2.boltcode.vip?visiter_id=&visiter_name=&avatar=&business_id=1&groupid=0&special=1', '_blank')}
+          onClick={() => setActiveTab('recharge')}
           style={{
             flex: 1,
             padding: '1rem',
             border: 'none',
             background: 'transparent',
-            color: '#ef4444',
+            color: activeTab === 'recharge' ? '#ef4444' : '#6b7280',
             fontSize: '1rem',
             fontWeight: 500,
             cursor: 'pointer',
-            borderBottom: '2px solid #ef4444'
+            borderBottom: activeTab === 'recharge' ? '2px solid #ef4444' : '2px solid transparent'
           }}
         >
           充值
@@ -431,3 +461,6 @@ export default function FinancePage() {
     </div>
   );
 }
+
+
+
